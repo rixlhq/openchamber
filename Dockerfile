@@ -34,13 +34,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Latest Libs
 RUN curl -fsSL https://bun.com/install | bash
 RUN curl -fsSL https://vite.plus | bash
+RUN curl -fsSL https://vite.plus | bash
+ENV PATH="/root/.bun/bin:$PATH"
+ENV PATH="/root/.vite-plus/bin:$PATH"
+RUN bun --version
 
 # Go
 RUN wget -O /tmp/go.tgz "https://go.dev/dl/$(curl "https://go.dev/VERSION?m=text" | head -n1).linux-amd64.tar.gz"
 RUN rm -rf /usr/local/go \
     && tar -C /usr/local -xzf /tmp/go.tgz \
     && rm /tmp/go.tgz
-ENV PATH="/usr/local/go/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:$PATH"
 RUN go version
 
 ENV NPM_CONFIG_PREFIX=/root/.npm-global
@@ -64,6 +68,11 @@ COPY --from=builder /app/packages/web/package.json ./packages/web/package.json
 COPY --from=builder /app/packages/web/bin ./packages/web/bin
 COPY --from=builder /app/packages/web/server ./packages/web/server
 COPY --from=builder /app/packages/web/dist ./packages/web/dist
+
+## Python
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+RUN uv python install 3.11 3.12 3.13 3.14
 
 EXPOSE 3000
 

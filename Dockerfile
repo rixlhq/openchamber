@@ -9,14 +9,14 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/web/package.json ./packages/web/
 COPY packages/desktop/package.json ./packages/desktop/
 COPY packages/vscode/package.json ./packages/vscode/
-RUN bun install --frozen-lockfile --ignore-scripts
+RUN bun install --ignore-scripts
 
 FROM deps AS builder
 WORKDIR /app
 COPY . .
 RUN bun run build:web
 
-FROM oven/bun:1 AS runtime
+FROM mcr.microsoft.com/devcontainers/universal:dev AS runtime
 WORKDIR /home/openchamber
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -29,6 +29,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   openssh-client \
   python3 \
   && rm -rf /var/lib/apt/lists/*
+
+# Latest Libs
+RUN curl -fsSL https://bun.com/install | bash
+RUN curl -fsSL https://vite.plus | bash
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \
+    && rm -rf /usr/local/go \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Replace the base image's 'bun' user (UID 1000) with 'openchamber'
 # so mounted volumes with 1000:1000 ownership work correctly.

@@ -1,0 +1,18 @@
+name: Build and Publish Services
+
+on:
+  push:
+    branches: [ rixl ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: rixlhq/github-actions/.github/workflows/docker-publish.yml@v1.9.10
+    with:
+      service: openchamber
+      version: "latest"
+    secrets: inherit

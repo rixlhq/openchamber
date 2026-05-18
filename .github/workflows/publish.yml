@@ -10,9 +10,41 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: rixlhq/github-actions/.github/workflows/docker-publish.yml@v1.9.10
-    with:
-      service: openchamber
-      version: "latest"
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 🐳️ Login to Scaleway Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.CONTAINER_REGISTRY_URL }}
+          username: nologin
+          password: ${{ secrets.CONTAINER_REGISTRY_SECRET }}
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Builder
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏷️ Set Docker tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ secrets.CONTAINER_REGISTRY_URL }}/${{ secrets.CONTAINER_REGISTRY_NAME }}/rixl-openchamber
+          tags: |
+            type=raw,value={{branch}}-{{date 'YYYYMMDDHHmmss'}}-{{sha}}
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: 🐳️ Build and Push Multi-Arch Image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=docker-openchamber
+          cache-to: type=gha,mode=max,scope=docker-openchamber

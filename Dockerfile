@@ -1,58 +1,65 @@
-# syntax=docker/dockerfile:1
-FROM oven/bun:1 AS base
-WORKDIR /app
+FROM ubuntu:26.04 AS runtime
 
-FROM base AS deps
-WORKDIR /app
-COPY package.json bun.lock ./
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/web/package.json ./packages/web/
-COPY packages/desktop/package.json ./packages/desktop/
-COPY packages/vscode/package.json ./packages/vscode/
-RUN bun install --ignore-scripts
+ARG NVM_VERSION=0.40.4
+ARG NODE_VERSION=25
 
-FROM deps AS builder
-WORKDIR /app
-COPY . .
-RUN bun run build:web
+ARG DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
 
-FROM mcr.microsoft.com/devcontainers/universal:6 AS runtime
 WORKDIR /root
+USER root
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  bash ca-certificates git less openssh-client python3 sudo \
-  && rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get install -y build-essential
+RUN apt-get install -y unzip zip bzip2 xz-utils tar
+RUN apt-get install -y pkg-config libssl-dev libffi-dev zlib1g-dev
+RUN apt-get install -y libicu-dev
+RUN apt-get install -y sudo gnupg2
+RUN apt-get install -y ca-certificates bash curl less wget openssh-client
+RUN apt-get install -y ripgrep fd-find tree procps jq yq lsof iproute2 netcat-openbsd
+RUN apt-get install -y git gh
 
+# Python
+RUN curl -LsSf https://astral.sh/uv/install.sh | bash
+ENV PATH="/root/.local/bin/:$PATH"
+RUN uv python install 3.11 3.12 3.13 3.14
+RUN uv python install --default
+
+# NODE
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh | bash
+ENV NVM_DIR=/root/.nvm
+RUN . $NVM_DIR/nvm.sh && \
+    nvm install $NODE_VERSION && \
+    nvm alias default $NODE_VERSION && \
+    nvm use default && \
+    ln -s $(which node) /usr/local/bin/node && \
+    ln -s $(which npm) /usr/local/bin/npm && \
+    ln -s $(which npx) /usr/local/bin/npx
+
+# Bun
 RUN curl -fsSL https://bun.com/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Vite Plus
 RUN curl -fsSL https://vite.plus | bash
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.vite-plus:${PATH}"
+
+RUN bun add -g opencode-ai
+RUN curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
 
 # Go
 RUN wget -O /tmp/go.tgz "https://go.dev/dl/$(curl "https://go.dev/VERSION?m=text" | head -n1).linux-amd64.tar.gz"
 RUN rm -rf /usr/local/go
 RUN tar -C /usr/local -xzf /tmp/go.tgz
 RUN rm /tmp/go.tgz
+ENV PATH="/usr/local/go/bin:${PATH}"
 
-ENV PATH="/root/.bun/bin:/root/.vite-plus/bin:/root/.local/bin:/usr/local/go/bin:${PATH}"
-
-RUN mkdir -p /root/.local /root/.config /root/.ssh && \
-  bun add -g opencode-ai
-
-# cloudflared 2026.3.0 - update digest explicitly when upgrading
-COPY --from=cloudflare/cloudflared@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
-
-ENV NODE_ENV=production
-
-COPY scripts/docker-entrypoint.sh /root/openchamber-entrypoint.sh
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/packages/web/package.json ./packages/web/package.json
-COPY --from=builder /app/packages/web/bin ./packages/web/bin
-COPY --from=builder /app/packages/web/server ./packages/web/server
-COPY --from=builder /app/packages/web/dist ./packages/web/dist
+RUN mkdir -p /root/.local /root/.config /root/.ssh
 
 EXPOSE 3000
 
-ENTRYPOINT ["sh", "/root/openchamber-entrypoint.sh"]
+ENV OPENCODE_CONFIG_DIR="${HOME}/.config/opencode"
+ENV OPENCHAMBER_OPENCODE_HOSTNAME=0.0.0.0
+ENV OPENCHAMBER_HOST=0.0.0.0
+ENV UI_PASSWORD=""
+ENTRYPOINT ["openchamber", "--foreground"]

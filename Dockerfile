@@ -47,9 +47,6 @@ RUN rm -rf /usr/local/go \
 ENV PATH="/usr/local/go/bin:$PATH"
 RUN go version
 
-ENV NPM_CONFIG_PREFIX=/root/.npm-global
-ENV PATH=${NPM_CONFIG_PREFIX}/bin:${PATH}
-
 RUN mkdir -p /root/.local /root/.config /root/.ssh && \
   bun add -g opencode-ai
 

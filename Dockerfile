@@ -29,9 +29,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Go
 RUN wget -O /tmp/go.tgz "https://go.dev/dl/$(curl "https://go.dev/VERSION?m=text" | head -n1).linux-amd64.tar.gz"
-RUN rm -rf /usr/local/go \
-    && tar -C /usr/local -xzf /tmp/go.tgz \
-    && rm /tmp/go.tgz \
+RUN rm -rf /usr/local/go
+RUN tar -C /usr/local -xzf /tmp/go.tgz
+RUN rm /tmp/go.tgz
 
 ENV PATH="/root/.bun/bin:/root/.vite-plus/bin:/root/.local/bin:/usr/local/go/bin:${PATH}"
 
